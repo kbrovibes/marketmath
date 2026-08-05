@@ -4,6 +4,7 @@ import {
   fetchTickerCikMap,
   latestSharesOutstanding,
   resolveAnnual,
+  resolveQuarterly,
 } from "@/lib/ingest/sec";
 import { fetchMonthly } from "@/lib/ingest/yahoo";
 import { computeMetrics, AnnualFundamentals } from "@/lib/metrics";
@@ -64,8 +65,10 @@ export async function ensureCompany(tickerRaw: string): Promise<boolean> {
 
   let rows: ReturnType<typeof resolveAnnual> = [];
   let shares: number | null = null;
+  let cfSaved: Awaited<ReturnType<typeof fetchCompanyFacts>> | null = null;
   try {
     const cf = await fetchCompanyFacts(cik);
+    cfSaved = cf;
     rows = resolveAnnual(cf, 20);
     shares = latestSharesOutstanding(cf);
     if (cf.entityName) name = cf.entityName;
@@ -110,6 +113,21 @@ export async function ensureCompany(tickerRaw: string): Promise<boolean> {
     })),
     { onConflict: "ticker,fiscal_year" }
   );
+
+  const quarters = resolveQuarterly(cfSaved!, rows);
+  if (quarters.length > 0) {
+    await db.from("mm_fundamentals_quarterly").upsert(
+      quarters.map((q) => ({
+        ticker,
+        end_date: q.end_date,
+        fiscal_year: q.fiscal_year,
+        fq: q.fq,
+        derived: q.derived,
+        ...q.values,
+      })),
+      { onConflict: "ticker,end_date" }
+    );
+  }
 
   let quotePrice: number | null = null;
   let marketCap: number | null = null;

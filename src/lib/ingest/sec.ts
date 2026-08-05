@@ -221,6 +221,108 @@ export function resolveAnnual(cf: CompanyFacts, maxYears = 20): AnnualRow[] {
   return rows;
 }
 
+const QUARTERLY_CONCEPTS = ["revenue", "net_income", "eps_diluted"] as const;
+const QUARTERLY_FORMS = new Set(["10-Q", "10-Q/A", "10-K", "10-K/A"]);
+
+export type QuarterRow = {
+  end_date: string;
+  fiscal_year: number | null;
+  fq: number | null;
+  derived: boolean; // Q4 computed as FY − (Q1+Q2+Q3)
+  values: Record<string, number | null>;
+};
+
+/**
+ * Discrete quarterly values for revenue / net income / diluted EPS.
+ * Uses ~90-day duration facts from 10-Qs (canonical `frame` preferred),
+ * then derives Q4 from the annual totals since filers rarely report it
+ * discretely. OCF is intentionally excluded (10-Qs report it year-to-date).
+ */
+export function resolveQuarterly(
+  cf: CompanyFacts,
+  annual: AnnualRow[],
+  maxQuarters = 21
+): QuarterRow[] {
+  const byEnd = new Map<string, Record<string, number | null>>();
+
+  for (const concept of QUARTERLY_CONCEPTS) {
+    for (const tag of TAG_CHAINS[concept]) {
+      const groups = new Map<string, Fact[]>();
+      for (const f of factsFor(cf, tag)) {
+        if (!f.start || !QUARTERLY_FORMS.has(f.form)) continue;
+        const d = daysBetween(f.start, f.end);
+        if (d < 80 || d > 100) continue;
+        (groups.get(f.end) ?? groups.set(f.end, []).get(f.end)!).push(f);
+      }
+      for (const [end, group] of groups) {
+        const row = byEnd.get(end) ?? {};
+        if (row[concept] != null) continue; // first tag with data wins per end date
+        const canonical =
+          group.find((f) => /^CY\d{4}Q\d$/.test(f.frame ?? "")) ??
+          group.reduce((a, b) => (a.filed >= b.filed ? a : b));
+        row[concept] = canonical.val;
+        byEnd.set(end, row);
+      }
+    }
+  }
+
+  const fyEnds = annual
+    .map((a) => ({ fy: a.fiscal_year, end: a.end_date }))
+    .sort((a, b) => a.end.localeCompare(b.end));
+
+  const lastFy = fyEnds[fyEnds.length - 1];
+  const rows: QuarterRow[] = [...byEnd.entries()]
+    .map(([end, values]) => {
+      const fye = fyEnds.find(
+        (f) => f.end >= end && daysBetween(end, f.end) < 370
+      );
+      let fiscalYear: number | null = fye?.fy ?? null;
+      let fq: number | null = null;
+      if (fye) {
+        fq = Math.min(4, Math.max(1, 4 - Math.round(daysBetween(end, fye.end) / 91)));
+      } else if (lastFy && end > lastFy.end && daysBetween(lastFy.end, end) < 370) {
+        // Quarters of the in-progress fiscal year (no 10-K filed yet)
+        fiscalYear = lastFy.fy + 1;
+        fq = Math.min(4, Math.max(1, Math.round(daysBetween(lastFy.end, end) / 91)));
+      }
+      return {
+        end_date: end,
+        fiscal_year: fiscalYear,
+        fq,
+        derived: false,
+        values,
+      };
+    })
+    .sort((a, b) => a.end_date.localeCompare(b.end_date));
+
+  // Derive Q4 per fiscal year when Q1–Q3 are present and Q4 isn't
+  for (const a of annual) {
+    if (rows.some((r) => r.end_date === a.end_date)) continue;
+    const qs = rows.filter((r) => r.fiscal_year === a.fiscal_year && !r.derived);
+    if (qs.length !== 3) continue;
+    const values: Record<string, number | null> = {};
+    for (const concept of QUARTERLY_CONCEPTS) {
+      const fy = a.values[concept];
+      const parts = qs.map((q) => q.values[concept]);
+      values[concept] =
+        fy != null && parts.every((p) => p != null)
+          ? fy - parts.reduce((s, p) => s! + p!, 0)!
+          : null;
+    }
+    if (Object.values(values).every((v) => v == null)) continue;
+    rows.push({
+      end_date: a.end_date,
+      fiscal_year: a.fiscal_year,
+      fq: 4,
+      derived: true,
+      values,
+    });
+  }
+
+  rows.sort((a, b) => a.end_date.localeCompare(b.end_date));
+  return rows.slice(-maxQuarters);
+}
+
 /** Latest point-in-time shares outstanding (dei cover-page data). */
 export function latestSharesOutstanding(cf: CompanyFacts): number | null {
   const node = cf.facts["dei"]?.["EntityCommonStockSharesOutstanding"];

@@ -34,6 +34,7 @@ async function getData(tickerRaw: string, useAdmin = false) {
     { data: metrics },
     { data: prices },
     { data: spyPrices },
+    { data: quarters },
   ] = await Promise.all([
     client.from("mm_companies").select("*").eq("ticker", ticker).maybeSingle(),
     client
@@ -52,6 +53,11 @@ async function getData(tickerRaw: string, useAdmin = false) {
       .select("month,adj_close")
       .eq("ticker", "SPY")
       .order("month", { ascending: true }),
+    client
+      .from("mm_fundamentals_quarterly")
+      .select("*")
+      .eq("ticker", ticker)
+      .order("end_date", { ascending: true }),
   ]);
   return {
     company,
@@ -59,7 +65,30 @@ async function getData(tickerRaw: string, useAdmin = false) {
     metrics: metrics?.data as Metrics | undefined,
     prices: prices ?? [],
     spyPrices: spyPrices ?? [],
+    quarters: (quarters ?? []) as QuarterlyRow[],
   };
+}
+
+type QuarterlyRow = {
+  end_date: string;
+  fiscal_year: number | null;
+  fq: number | null;
+  derived: boolean;
+  revenue: number | null;
+  net_income: number | null;
+  eps_diluted: number | null;
+};
+
+function qLabel(q: QuarterlyRow): string {
+  return q.fiscal_year && q.fq ? `Q${q.fq}'${String(q.fiscal_year).slice(-2)}` : q.end_date.slice(0, 7);
+}
+
+/** YoY change vs the quarter 4 positions earlier (same fiscal quarter). */
+function qYoY(quarters: QuarterlyRow[], i: number, key: "revenue" | "net_income" | "eps_diluted"): number | null {
+  const cur = quarters[i]?.[key];
+  const prev = quarters[i - 4]?.[key];
+  if (cur == null || prev == null || prev <= 0) return null;
+  return cur / prev - 1;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -75,8 +104,9 @@ export default async function CompanyPage({ params }: PageProps) {
     const ingested = await ensureCompany(raw);
     if (ingested) data = await getData(raw, true);
   }
-  const { company, rows: rawRows, metrics: m, prices, spyPrices } = data;
+  const { company, rows: rawRows, metrics: m, prices, spyPrices, quarters } = data;
   if (!company) notFound();
+  const recentQ = quarters.slice(-13);
 
   const rows = splitAdjust(rawRows);
   const track = buildTrackRecord(rows, prices, spyPrices);
@@ -300,6 +330,67 @@ export default async function CompanyPage({ params }: PageProps) {
           </Card>
         </div>
       </Section>
+
+      {/* Quarterly */}
+      {recentQ.length >= 4 && (
+        <Section
+          title="Quarterly"
+          subtitle="Discrete quarters from 10-Q filings; Q4 derived as fiscal year minus Q1–Q3. Compare to the same quarter a year ago — most businesses are seasonal."
+        >
+          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-8">
+            <Card className="p-4">
+              <BarSeries
+                data={recentQ.map((q) => ({ x: qLabel(q), y: q.revenue }))}
+                formatY={(v) => fmtMoney(v)}
+                title="Revenue by quarter"
+                height={140}
+              />
+            </Card>
+            <Card className="p-4">
+              <BarSeries
+                data={recentQ.map((q) => ({ x: qLabel(q), y: q.net_income }))}
+                formatY={(v) => fmtMoney(v)}
+                title="Net income by quarter"
+                height={140}
+              />
+            </Card>
+          </div>
+          <div className="mt-4 overflow-x-auto border border-border rounded-xl bg-surface">
+            <table className="w-full text-xs sm:text-sm">
+              <thead>
+                <tr className="border-b border-border text-right">
+                  <th className="text-left px-3 py-2 font-medium text-muted sticky left-0 bg-surface">Quarter</th>
+                  <th className="px-3 py-2 font-medium text-muted">Revenue</th>
+                  <th className="px-3 py-2 font-medium text-muted">YoY</th>
+                  <th className="px-3 py-2 font-medium text-muted">Net income</th>
+                  <th className="px-3 py-2 font-medium text-muted">YoY</th>
+                  <th className="px-3 py-2 font-medium text-muted">EPS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...recentQ].reverse().map((q) => {
+                  const i = quarters.indexOf(q);
+                  const revYoY = qYoY(quarters, i, "revenue");
+                  const niYoY = qYoY(quarters, i, "net_income");
+                  return (
+                    <tr key={q.end_date} className="border-b border-border last:border-0 text-right tnum hover:bg-black/[0.02]">
+                      <td className="text-left px-3 py-1.5 font-medium sticky left-0 bg-surface">
+                        {qLabel(q)}
+                        {q.derived && <span className="text-faint font-normal" title="Derived: FY − (Q1+Q2+Q3)"> *</span>}
+                      </td>
+                      <td className="px-3 py-1.5">{fmtMoney(q.revenue)}</td>
+                      <td className={`px-3 py-1.5 ${pctColor(revYoY)}`}>{fmtPctSigned(revYoY)}</td>
+                      <td className="px-3 py-1.5">{fmtMoney(q.net_income)}</td>
+                      <td className={`px-3 py-1.5 ${pctColor(niYoY)}`}>{fmtPctSigned(niYoY)}</td>
+                      <td className="px-3 py-1.5">{q.eps_diluted != null ? fmtNum(q.eps_diluted) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
 
       {/* Track record */}
       <Section

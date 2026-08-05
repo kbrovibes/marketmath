@@ -3,6 +3,7 @@ import { dbAdmin } from "@/lib/supabase";
 import {
   fetchCompanyFacts,
   resolveAnnual,
+  resolveQuarterly,
   latestSharesOutstanding,
   sleep,
 } from "@/lib/ingest/sec";
@@ -45,6 +46,20 @@ export async function GET(req: NextRequest) {
             source_tags: r.source_tags,
           })),
           { onConflict: "ticker,fiscal_year" }
+        );
+      }
+      const quarters = resolveQuarterly(cf, rows);
+      if (quarters.length > 0) {
+        await db.from("mm_fundamentals_quarterly").upsert(
+          quarters.map((q) => ({
+            ticker: c.ticker,
+            end_date: q.end_date,
+            fiscal_year: q.fiscal_year,
+            fq: q.fq,
+            derived: q.derived,
+            ...q.values,
+          })),
+          { onConflict: "ticker,end_date" }
         );
       }
       const shares = latestSharesOutstanding(cf);

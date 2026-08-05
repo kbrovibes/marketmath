@@ -7,6 +7,7 @@ import { fetchSp500 } from "../src/lib/ingest/universe";
 import {
   fetchCompanyFacts,
   resolveAnnual,
+  resolveQuarterly,
   latestSharesOutstanding,
   sleep,
 } from "../src/lib/ingest/sec";
@@ -65,6 +66,22 @@ async function main() {
   );
 
   let targets = universe.filter((u) => !onlyTickers || onlyTickers.has(u.ticker));
+  // --tickers may name companies outside the index (on-demand ingested) — pull their cik from the DB
+  if (onlyTickers) {
+    const missing = [...onlyTickers].filter(
+      (t) => t !== "SPY" && !targets.some((u) => u.ticker === t)
+    );
+    if (missing.length > 0) {
+      const { data: extra } = await db
+        .from("mm_companies")
+        .select("ticker,cik,name")
+        .in("ticker", missing);
+      for (const e of extra ?? []) {
+        if (e.cik && e.cik !== "0")
+          targets.push({ ticker: e.ticker, name: e.name, sector: "", subIndustry: "", cik: e.cik });
+      }
+    }
+  }
   targets = targets.slice(0, limit);
   if (!skipPrices)
     targets.push({ ticker: "SPY", name: "SPY", sector: "", subIndustry: "", cik: "0" });
@@ -88,6 +105,21 @@ async function main() {
             { onConflict: "ticker,fiscal_year" }
           );
           if (error) console.error(`   ${u.ticker}: db ${error.message}`);
+        }
+        const quarters = resolveQuarterly(cf, rows);
+        if (quarters.length > 0) {
+          const { error } = await db.from("mm_fundamentals_quarterly").upsert(
+            quarters.map((q) => ({
+              ticker: u.ticker,
+              end_date: q.end_date,
+              fiscal_year: q.fiscal_year,
+              fq: q.fq,
+              derived: q.derived,
+              ...q.values,
+            })),
+            { onConflict: "ticker,end_date" }
+          );
+          if (error) console.error(`   ${u.ticker}: quarterly db ${error.message}`);
         }
         // dei cover-page shares can be null/ambiguous for multi-class companies
         // (GOOGL, META…) — fall back to latest diluted weighted shares.
