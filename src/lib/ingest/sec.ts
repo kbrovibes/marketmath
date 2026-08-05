@@ -232,11 +232,39 @@ export type QuarterRow = {
   values: Record<string, number | null>;
 };
 
+/** YTD-cumulative OCF facts bucketed by duration; end date → canonical value. */
+function ocfByDuration(
+  cf: CompanyFacts,
+  lo: number,
+  hi: number
+): Map<string, number> {
+  const groups = new Map<string, Fact[]>();
+  for (const tag of TAG_CHAINS.ocf) {
+    for (const f of factsFor(cf, tag)) {
+      if (!f.start || !QUARTERLY_FORMS.has(f.form)) continue;
+      const d = daysBetween(f.start, f.end);
+      if (d < lo || d > hi) continue;
+      (groups.get(f.end) ?? groups.set(f.end, []).get(f.end)!).push(f);
+    }
+    if (groups.size > 0) break; // first tag with data wins
+  }
+  const out = new Map<string, number>();
+  for (const [end, group] of groups) {
+    const canonical =
+      group.find((f) => /^CY\d{4}Q\d$/.test(f.frame ?? "")) ??
+      group.reduce((a, b) => (a.filed >= b.filed ? a : b));
+    out.set(end, canonical.val);
+  }
+  return out;
+}
+
 /**
- * Discrete quarterly values for revenue / net income / diluted EPS.
+ * Discrete quarterly values for revenue / net income / diluted EPS / OCF.
  * Uses ~90-day duration facts from 10-Qs (canonical `frame` preferred),
  * then derives Q4 from the annual totals since filers rarely report it
- * discretely. OCF is intentionally excluded (10-Qs report it year-to-date).
+ * discretely. OCF is reported year-to-date in 10-Qs and unwound here:
+ * Q1 = ~90d fact, Q2 = H1 − Q1, Q3 = 9M − H1, Q4 = FY − 9M, with discrete
+ * ~90d facts preferred over subtraction when a filer reports them.
  */
 export function resolveQuarterly(
   cf: CompanyFacts,
@@ -317,6 +345,41 @@ export function resolveQuarterly(
       derived: true,
       values,
     });
+  }
+
+  const ocfQ = ocfByDuration(cf, 80, 100);
+  const ocfH1 = ocfByDuration(cf, 170, 190);
+  const ocf9M = ocfByDuration(cf, 260, 290);
+  const annualOcf = new Map(annual.map((a) => [a.fiscal_year, a.values.ocf]));
+
+  const byFy = new Map<number, QuarterRow[]>();
+  for (const r of rows) {
+    if (r.fiscal_year == null || r.fq == null) {
+      r.values.ocf = ocfQ.get(r.end_date) ?? null;
+      continue;
+    }
+    (byFy.get(r.fiscal_year) ?? byFy.set(r.fiscal_year, []).get(r.fiscal_year)!).push(r);
+  }
+  for (const [fy, qs] of byFy) {
+    const byFq = new Map(qs.map((q) => [q.fq!, q]));
+    const ytd = (fq: number): number | null => {
+      const end = byFq.get(fq)?.end_date;
+      if (end == null) return fq === 4 ? annualOcf.get(fy) ?? null : null;
+      if (fq === 1) return ocfQ.get(end) ?? null;
+      if (fq === 2) return ocfH1.get(end) ?? null;
+      if (fq === 3) return ocf9M.get(end) ?? null;
+      return annualOcf.get(fy) ?? null;
+    };
+    for (const q of qs) {
+      const discrete = ocfQ.get(q.end_date);
+      if (q.fq === 1) {
+        q.values.ocf = discrete ?? null;
+        continue;
+      }
+      const cur = ytd(q.fq!);
+      const prev = ytd(q.fq! - 1);
+      q.values.ocf = discrete ?? (cur != null && prev != null ? cur - prev : null);
+    }
   }
 
   rows.sort((a, b) => a.end_date.localeCompare(b.end_date));

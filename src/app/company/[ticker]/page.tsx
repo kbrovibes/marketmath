@@ -77,6 +77,7 @@ type QuarterlyRow = {
   revenue: number | null;
   net_income: number | null;
   eps_diluted: number | null;
+  ocf: number | null;
 };
 
 function qLabel(q: QuarterlyRow): string {
@@ -335,7 +336,7 @@ export default async function CompanyPage({ params }: PageProps) {
       {recentQ.length >= 4 && (
         <Section
           title="Quarterly"
-          subtitle="Discrete quarters from 10-Q filings; Q4 derived as fiscal year minus Q1–Q3. Compare to the same quarter a year ago — most businesses are seasonal."
+          subtitle="Discrete quarters from 10-Q filings; Q4 derived as fiscal year minus Q1–Q3. OCF is unwound from the year-to-date figures 10-Qs report. Compare to the same quarter a year ago — most businesses are seasonal."
         >
           <div className="grid sm:grid-cols-2 gap-x-8 gap-y-8">
             <Card className="p-4">
@@ -365,6 +366,7 @@ export default async function CompanyPage({ params }: PageProps) {
                   <th className="px-3 py-2 font-medium text-muted">Net income</th>
                   <th className="px-3 py-2 font-medium text-muted">YoY</th>
                   <th className="px-3 py-2 font-medium text-muted">EPS</th>
+                  <th className="px-3 py-2 font-medium text-muted">OCF</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,6 +385,7 @@ export default async function CompanyPage({ params }: PageProps) {
                       <td className="px-3 py-1.5">{fmtMoney(q.net_income)}</td>
                       <td className={`px-3 py-1.5 ${pctColor(niYoY)}`}>{fmtPctSigned(niYoY)}</td>
                       <td className="px-3 py-1.5">{q.eps_diluted != null ? fmtNum(q.eps_diluted) : "—"}</td>
+                      <td className="px-3 py-1.5">{fmtMoney(q.ocf)}</td>
                     </tr>
                   );
                 })}
