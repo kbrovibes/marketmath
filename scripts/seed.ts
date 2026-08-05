@@ -52,8 +52,22 @@ async function main() {
   );
   if (upErr) throw new Error(`companies upsert: ${upErr.message}`);
 
+  // SPY pseudo-company row for benchmark comparisons
+  await db.from("mm_companies").upsert(
+    {
+      ticker: "SPY",
+      cik: "0",
+      name: "SPDR S&P 500 ETF (benchmark)",
+      sector: null,
+      is_sp500: false,
+    },
+    { onConflict: "ticker" }
+  );
+
   let targets = universe.filter((u) => !onlyTickers || onlyTickers.has(u.ticker));
   targets = targets.slice(0, limit);
+  if (!skipPrices)
+    targets.push({ ticker: "SPY", name: "SPY", sector: "", subIndustry: "", cik: "0" });
 
   if (!skipFundamentals) {
     console.log(`2/4 fundamentals for ${targets.length} tickers (SEC, ~5/s)…`);

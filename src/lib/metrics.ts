@@ -23,6 +23,9 @@ export type AnnualFundamentals = {
   equity: number | null;
   assets: number | null;
   liabilities: number | null;
+  ppne?: number | null;
+  rnd?: number | null;
+  interest_expense?: number | null;
 };
 
 export type CompanyQuote = {
@@ -147,6 +150,12 @@ export type Metrics = {
   buyback_yield: number | null;
   shareholder_yield: number | null;
   payout_ratio_fcf: number | null;
+  // cash-based returns & house anchors
+  roic_cfo: number | null; // OCF / (equity + LT debt)
+  ocf_yield_ev: number | null; // OCF / enterprise value
+  mc_vs_10x_ocf: number | null; // market cap ÷ (10 × OCF); ≤1 = at or below 10× OCF
+  sales_efficiency: number | null; // Δ net PP&E per $1 of Δ revenue, ~5y window
+  ppne_to_revenue: number | null; // capital intensity
   // interpretation
   implied_fcf_growth: number | null; // reverse DCF
   lynch_class: string | null;
@@ -219,6 +228,14 @@ export function computeMetrics(
     sbc_to_fcf:
       latest?.fcf != null && latest.fcf > 0 ? safeDiv(latest?.sbc, latest?.fcf) : null,
     share_change_5y: null,
+    roic_cfo:
+      latest?.ocf != null && (latest.equity ?? 0) + (latest.lt_debt ?? 0) > 0
+        ? latest.ocf / ((latest.equity ?? 0) + (latest.lt_debt ?? 0))
+        : null,
+    ocf_yield_ev: null,
+    mc_vs_10x_ocf: null,
+    sales_efficiency: null,
+    ppne_to_revenue: safeDiv(latest?.ppne ?? null, latest?.revenue),
     pe: null,
     pfcf: null,
     ps: null,
@@ -263,6 +280,24 @@ export function computeMetrics(
       m.shareholder_yield = (m.dividend_yield ?? 0) + (m.buyback_yield ?? 0);
     if (latest.fcf && latest.fcf > 0)
       m.implied_fcf_growth = reverseDcfImpliedGrowth(mcap, latest.fcf);
+    if (latest.ocf != null && latest.ocf > 0) {
+      m.mc_vs_10x_ocf = mcap / (10 * latest.ocf);
+      const ev = mcap + (latest.lt_debt ?? 0) - (latest.cash ?? 0);
+      if (ev > 0) m.ocf_yield_ev = latest.ocf / ev;
+    }
+  }
+
+  // Sales efficiency: capital added per $1 of new revenue over ~5 years
+  {
+    const usable = rows.filter((r) => r.ppne != null && r.revenue != null);
+    if (usable.length >= 3) {
+      const last = usable[usable.length - 1];
+      const candidates = usable.filter((r) => r.fiscal_year <= last.fiscal_year - 5);
+      const base = candidates.length > 0 ? candidates[candidates.length - 1] : usable[0];
+      const dRev = (last.revenue ?? 0) - (base.revenue ?? 0);
+      const dPpne = (last.ppne ?? 0) - (base.ppne ?? 0);
+      if (dRev > 0) m.sales_efficiency = dPpne / dRev;
+    }
   }
   if (latest?.fcf && latest.fcf > 0)
     m.payout_ratio_fcf =

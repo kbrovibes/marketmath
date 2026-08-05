@@ -102,6 +102,13 @@ export const TAG_CHAINS: Record<string, string[]> = {
   ],
   assets: ["Assets"],
   liabilities: ["Liabilities"],
+  ppne: ["PropertyPlantAndEquipmentNet"],
+  rnd: ["ResearchAndDevelopmentExpense"],
+  interest_expense: [
+    "InterestExpense",
+    "InterestExpenseDebt",
+    "InterestExpenseNonoperating",
+  ],
 };
 
 const INSTANT_CONCEPTS = new Set([
@@ -110,6 +117,7 @@ const INSTANT_CONCEPTS = new Set([
   "equity",
   "assets",
   "liabilities",
+  "ppne",
 ]);
 
 const ANNUAL_FORMS = new Set(["10-K", "10-K/A", "20-F", "20-F/A"]);
