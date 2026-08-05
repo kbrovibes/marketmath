@@ -29,7 +29,10 @@ async function cikFor(ticker: string): Promise<string | null> {
  * Returns true if the ticker is now in the database. ~2-4s on first hit;
  * everything after reads from Supabase. Idempotent (upserts throughout).
  */
-export async function ensureCompany(tickerRaw: string): Promise<boolean> {
+export async function ensureCompany(
+  tickerRaw: string,
+  opts: { force?: boolean } = {}
+): Promise<boolean> {
   const ticker = tickerRaw.toUpperCase();
   if (!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)) return false;
 
@@ -39,7 +42,7 @@ export async function ensureCompany(tickerRaw: string): Promise<boolean> {
     .select("ticker")
     .eq("ticker", ticker)
     .maybeSingle();
-  if (existing) return true;
+  if (existing && !opts.force) return true;
 
   const cik = await cikFor(ticker);
   if (!cik) return false;
@@ -85,19 +88,33 @@ export async function ensureCompany(tickerRaw: string): Promise<boolean> {
     shares = (latestRow.values.shares_diluted as number | null) ?? null;
   }
 
-  const { error: compErr } = await db.from("mm_companies").upsert(
-    {
-      ticker,
-      cik,
-      name,
-      sub_industry: sicDesc,
-      exchange,
-      is_sp500: false,
-      shares_outstanding: shares,
-      fundamentals_updated_at: new Date().toISOString(),
-    },
-    { onConflict: "ticker" }
-  );
+  // Existing rows (force refresh): keep curated metadata (sector, is_sp500)
+  // and update only the data-derived fields.
+  const { error: compErr } = existing
+    ? (
+        await db
+          .from("mm_companies")
+          .update({
+            shares_outstanding: shares,
+            fundamentals_updated_at: new Date().toISOString(),
+          })
+          .eq("ticker", ticker)
+      )
+    : (
+        await db.from("mm_companies").upsert(
+          {
+            ticker,
+            cik,
+            name,
+            sub_industry: sicDesc,
+            exchange,
+            is_sp500: false,
+            shares_outstanding: shares,
+            fundamentals_updated_at: new Date().toISOString(),
+          },
+          { onConflict: "ticker" }
+        )
+      );
   if (compErr) {
     console.error(`on-demand ${ticker}: company upsert failed:`, compErr.message);
     return false;
