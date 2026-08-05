@@ -64,31 +64,63 @@ export function BarSeries({
   const min = Math.min(...vals, 0);
   const range = max - min || 1;
   const zeroY = (max / range) * 100;
+  const yTop = (v: number) => ((max - v) / range) * 100;
+
+  // Axis reference lines: max, midpoint, and the zero line when negatives exist.
+  const gridVals: number[] = [];
+  if (max > 0) gridVals.push(max);
+  const mid = (max + min) / 2;
+  if (Math.abs(mid - max) / range > 0.15 && Math.abs(mid) / range > 0.08)
+    gridVals.push(mid);
+  if (min < 0) gridVals.push(min);
 
   return (
     <div>
       {title && <p className="text-xs font-medium text-muted mb-2">{title}</p>}
-      <div className="flex items-stretch gap-[3px]" style={{ height }}>
-        {data.map((d, i) => {
-          const v = d.y;
-          if (v == null || !isFinite(v))
-            return <div key={i} className="flex-1" />;
-          const hPct = (Math.abs(v) / range) * 100;
-          const topPct = v >= 0 ? zeroY - hPct : zeroY;
-          return (
-            <div key={i} className="flex-1 relative group min-w-0">
-              <div
-                className={`absolute left-0 right-0 rounded-[2px] ${
-                  v >= 0 ? "bg-accent/75 group-hover:bg-accent" : "bg-negative/70"
-                } transition-colors`}
-                style={{ top: `${topPct}%`, height: `${Math.max(hPct, 0.75)}%` }}
-              />
-              <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-white text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap z-10 tnum">
-                {d.x}: {formatY(v)}
+      <div className="relative" style={{ height }}>
+        {gridVals.map((g) => (
+          <div
+            key={g}
+            className="absolute left-0 right-0 border-t border-dashed border-border pointer-events-none"
+            style={{ top: `${yTop(g)}%` }}
+          >
+            <span
+              className={`absolute right-0 z-10 text-[9px] text-muted tnum leading-none px-1 py-0.5 rounded bg-[color:var(--surface)]/90 ${
+                g < 0 ? "top-0.5" : "-top-3.5"
+              }`}
+            >
+              {formatY(g)}
+            </span>
+          </div>
+        ))}
+        {min < 0 && (
+          <div
+            className="absolute left-0 right-0 border-t border-border-strong pointer-events-none"
+            style={{ top: `${zeroY}%` }}
+          />
+        )}
+        <div className="absolute inset-0 flex items-stretch gap-[3px]">
+          {data.map((d, i) => {
+            const v = d.y;
+            if (v == null || !isFinite(v))
+              return <div key={i} className="flex-1" />;
+            const hPct = (Math.abs(v) / range) * 100;
+            const topPct = v >= 0 ? zeroY - hPct : zeroY;
+            return (
+              <div key={i} className="flex-1 relative group min-w-0">
+                <div
+                  className={`absolute left-0 right-0 rounded-[2px] ${
+                    v >= 0 ? "bg-accent/75 group-hover:bg-accent" : "bg-negative/70"
+                  } transition-colors`}
+                  style={{ top: `${topPct}%`, height: `${Math.max(hPct, 0.75)}%` }}
+                />
+                <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-white text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap z-10 tnum">
+                  {d.x}: {formatY(v)}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
       <div className="flex gap-[3px] mt-1.5">
         {data.map((d, i) => (
