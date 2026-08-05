@@ -93,6 +93,48 @@ export function buildTrackRecord(
   return { spans, series, invested };
 }
 
+export type Reinvestment = {
+  span: number;
+  incRoic: number | null; // ΔOCF ÷ Δinvested capital
+  reinvestRate: number | null; // Δinvested capital ÷ Σ OCF over window
+  impliedGrowth: number | null; // incRoic × reinvestRate
+} | null;
+
+/**
+ * Growth engine decomposition: g ≈ reinvestment rate × incremental return on
+ * invested capital. Invested capital = LT debt + equity − cash.
+ */
+export function buildReinvestment(rows: AnnualFundamentals[], span = 5): Reinvestment {
+  const ic = (r: AnnualFundamentals): number | null =>
+    r.equity != null ? (r.lt_debt ?? 0) + r.equity - (r.cash ?? 0) : null;
+
+  const usable = rows.filter((r) => r.ocf != null && ic(r) != null);
+  if (usable.length < 3) return null;
+  const latest = usable[usable.length - 1];
+  const candidates = usable.filter((r) => r.fiscal_year <= latest.fiscal_year - span);
+  if (candidates.length === 0) return null;
+  const base = candidates[candidates.length - 1];
+
+  const dOcf = latest.ocf! - base.ocf!;
+  const dIc = ic(latest)! - ic(base)!;
+  const window = usable.filter(
+    (r) => r.fiscal_year > base.fiscal_year && r.fiscal_year <= latest.fiscal_year
+  );
+  const sumOcf = window.reduce((s, r) => s + (r.ocf ?? 0), 0);
+
+  const incRoic = dIc > 0 ? dOcf / dIc : null;
+  const reinvestRate = sumOcf > 0 ? dIc / sumOcf : null;
+  return {
+    span: latest.fiscal_year - base.fiscal_year,
+    incRoic,
+    reinvestRate,
+    impliedGrowth:
+      incRoic != null && reinvestRate != null && reinvestRate > 0
+        ? incRoic * reinvestRate
+        : null,
+  };
+}
+
 export type DollarTest = {
   span: number;
   retained: number | null; // Σ (net income − dividends)

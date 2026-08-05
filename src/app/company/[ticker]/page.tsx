@@ -11,7 +11,11 @@ import {
 import { fmtMoney, fmtNum, fmtPct, fmtPctSigned, fmtRatio, pctColor } from "@/lib/format";
 import { BarSeries, LineChart, Sparkline } from "@/components/charts";
 import { Badge, Card, Section, Stat } from "@/components/ui";
-import { buildTrackRecord, buildDollarTest } from "@/lib/track-record";
+import {
+  buildTrackRecord,
+  buildDollarTest,
+  buildReinvestment,
+} from "@/lib/track-record";
 
 export const revalidate = 3600;
 
@@ -67,6 +71,7 @@ export default async function CompanyPage({ params }: PageProps) {
   const rows = splitAdjust(rawRows);
   const track = buildTrackRecord(rows, prices, spyPrices);
   const dollarTest = buildDollarTest(rows, prices);
+  const reinvest = buildReinvestment(rows);
   const latest = rows[rows.length - 1];
   const years = rows.map((r) => r.fiscal_year);
   const isFinancial = latest?.gross_profit == null && latest?.operating_income == null;
@@ -403,6 +408,20 @@ export default async function CompanyPage({ params }: PageProps) {
             </>
           )}
         </div>
+
+        {reinvest && reinvest.impliedGrowth != null && (
+          <Card className="mt-4 p-4">
+            <p className="text-sm">
+              <span className="font-medium">Growth engine ({reinvest.span}y):</span>{" "}
+              reinvested <span className="tnum">{fmtPct(reinvest.reinvestRate)}</span> of
+              operating cash flow at an incremental return of{" "}
+              <span className="tnum">{fmtPct(reinvest.incRoic)}</span> — an organically
+              fundable growth rate of about{" "}
+              <strong className="tnum">{fmtPct(reinvest.impliedGrowth)}</strong> per year
+              (growth ≈ reinvestment rate × incremental ROIC).
+            </p>
+          </Card>
+        )}
       </Section>
 
       {/* Red flags */}
