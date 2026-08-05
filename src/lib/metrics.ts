@@ -3,6 +3,8 @@
  * All rates are decimals (0.12 = 12%).
  */
 
+import { buildChecklist, type Checklist } from "@/lib/checklist";
+
 export type AnnualFundamentals = {
   fiscal_year: number;
   end_date: string;
@@ -139,6 +141,10 @@ export type Metrics = {
   cash_to_debt: number | null;
   sbc_to_fcf: number | null;
   share_change_5y: number | null; // negative = buybacks shrinking count
+  // owner earnings (Buffett): OCF − capex − SBC
+  owner_earnings: number | null;
+  p_owner_earnings: number | null;
+  owner_earnings_yield: number | null;
   // valuation & yields
   pe: number | null;
   pfcf: number | null;
@@ -162,6 +168,7 @@ export type Metrics = {
   quality: string | null;
   quality_score: number | null; // 0-100
   red_flags: RedFlag[];
+  checklist: Checklist | null;
   years_of_data: number;
   latest_fy: number | null;
 };
@@ -236,6 +243,12 @@ export function computeMetrics(
     mc_vs_10x_ocf: null,
     sales_efficiency: null,
     ppne_to_revenue: safeDiv(latest?.ppne ?? null, latest?.revenue),
+    owner_earnings:
+      latest?.ocf != null
+        ? latest.ocf - Math.abs(latest.capex ?? 0) - Math.abs(latest.sbc ?? 0)
+        : null,
+    p_owner_earnings: null,
+    owner_earnings_yield: null,
     pe: null,
     pfcf: null,
     ps: null,
@@ -251,6 +264,7 @@ export function computeMetrics(
     quality: null,
     quality_score: null,
     red_flags: [],
+    checklist: null,
     years_of_data: rows.length,
     latest_fy: latest?.fiscal_year ?? null,
   };
@@ -284,6 +298,10 @@ export function computeMetrics(
       m.mc_vs_10x_ocf = mcap / (10 * latest.ocf);
       const ev = mcap + (latest.lt_debt ?? 0) - (latest.cash ?? 0);
       if (ev > 0) m.ocf_yield_ev = latest.ocf / ev;
+    }
+    if (m.owner_earnings != null) {
+      if (m.owner_earnings > 0) m.p_owner_earnings = mcap / m.owner_earnings;
+      m.owner_earnings_yield = m.owner_earnings / mcap;
     }
   }
 
@@ -322,6 +340,7 @@ export function computeMetrics(
           : "Low";
 
   m.red_flags = redFlags(rows, m);
+  m.checklist = rows.length >= 4 ? buildChecklist(rows, m) : null;
   return m;
 }
 

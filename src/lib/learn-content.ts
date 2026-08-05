@@ -451,6 +451,22 @@ export const METRICS: MetricDoc[] = [
       "The anchor ignores capex entirely, so capital-intensive companies look cheaper than they are — a business that must reinvest most of its OCF is not yielding 10% at 10× OCF. It also ignores debt; cross-check with OCF yield on EV, which fixes both blind spots for leverage. A fixed multiple cannot account for interest-rate regimes: when bonds yield 1%, 10× OCF is a stricter test than when they yield 5%.",
   },
 
+  {
+    slug: "owner-earnings",
+    name: "Owner earnings",
+    category: "Valuation",
+    oneLiner:
+      "Buffett's estimate of the cash an owner could actually withdraw each year: operating cash flow minus capital spending minus stock compensation.",
+    formula:
+      "Owner earnings = operating cash flow − capex − stock-based compensation; P/OE = market cap ÷ owner earnings; OE yield = owner earnings ÷ market cap",
+    why:
+      "Reported net income is an accountant's opinion; owner earnings ask the owner's question — after paying to keep the business running, how much cash could I take out this year without harming it? Buffett introduced the idea in his 1986 shareholder letter as earnings plus depreciation minus required capex. We compute it from operating cash flow, which already adds back non-cash charges, and additionally subtract stock-based compensation: SBC is a genuine cost paid in equity rather than cash, and treating it as free is how many modern income statements flatter themselves.",
+    goodBad:
+      "Compare P/OE with the ordinary P/E: when P/OE is far higher, accounting earnings overstate the cash reality (heavy capex or heavy SBC); when it is lower, the business generates more distributable cash than income suggests. An OE yield above 5% from a stable business is a meaningful cash return; a negative figure means the business consumes more than it produces once real costs are counted.",
+    caveats:
+      "Subtracting all capex is conservative — Buffett's definition only charges maintenance capex, but filings don't separate maintenance from growth spending, so heavy reinvestors look worse than they are. Treating SBC at its full expense value is likewise a strict choice. Not meaningful for banks and insurers, where capex is not the relevant reinvestment concept.",
+  },
+
   // ── Interpretation ────────────────────────────────────────────────────────
   {
     slug: "implied-fcf-growth",
@@ -496,6 +512,22 @@ export const METRICS: MetricDoc[] = [
       "70 and above is labeled High — strength across most dimensions simultaneously. 45–69 is Medium, typically strong in some areas and weak in others; the breakdown tells you which. Below 45 is Low, meaning multiple pillars are weak at once. The score requires at least 4 years of filing history to compute. Note that valuation is deliberately excluded: a great business at 60 times cash flow keeps its high score — quality and price are separate questions.",
     caveats:
       "Thresholds are calibrated for ordinary operating companies; banks, insurers, REITs, and young loss-making growth companies will score poorly or oddly because the inputs mean different things for them. The score is backward-looking by construction — a moat that just broke still scores on its history. Treat it as a filter and a summary of the record, never as a verdict on the future.",
+  },
+
+  {
+    slug: "checklist",
+    name: "Checklist score",
+    category: "Interpretation",
+    oneLiner:
+      "Roughly thirty explicit pass/fail checks across growth, profitability, balance sheet, capital allocation, and valuation, scored as the share passed.",
+    formula:
+      "Score = checks passed ÷ (checks passed + checks failed); checks whose inputs are structurally missing are marked n/a and excluded from both sides",
+    why:
+      "A checklist substitutes discipline for mood. Each check states its threshold openly — revenue CAGR at least 5%, debt under 3× FCF, SBC under 15% of FCF, and so on — so a company cannot pass on vibes, and you can disagree with a specific threshold rather than with an opaque score. Unlike the quality score, which weights and blends evidence into one number, the checklist keeps every judgment visible and equal-weighted: the value lies less in the headline percentage than in reading which specific checks fail.",
+    goodBad:
+      "Passing above roughly 75% of applicable checks is rare and marks a business strong on most dimensions at a defensible price. 50–75% is typical of decent companies with identifiable weaknesses — read the failed checks to see whether they are structural or cyclical. Below 50%, several pillars are failing at once. The n/a mechanism matters: a bank skipping capex-based checks is scored only on what applies to it.",
+    caveats:
+      "Every threshold is a judgment call applied uniformly across industries; sensible numbers for software are demanding for railroads. All checks weigh equally, though in reality one broken balance sheet outweighs three passed growth checks. The checks read the latest filings — they see last year's business, not next year's. Use the list as an inspection sheet, not a verdict.",
   },
 
   // ── Red flags ─────────────────────────────────────────────────────────────

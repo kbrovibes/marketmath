@@ -135,6 +135,76 @@ export function buildReinvestment(rows: AnnualFundamentals[], span = 5): Reinves
   };
 }
 
+export type MultipleBand = {
+  years: number;
+  medianMultiple: number;
+  currentMultiple: number | null;
+  low: number; // per-share value at 25th-percentile historical P/OCF
+  mid: number; // at median
+  high: number; // at 75th percentile
+} | null;
+
+/**
+ * Historical-multiple valuation band: what the stock would be worth today at
+ * its own historical P/OCF percentiles. Each fiscal year's market cap is
+ * approximated as adj_close nearest the fiscal-year end × that year's diluted
+ * shares (caller passes split-adjusted rows).
+ */
+export function buildMultipleBand(
+  rows: AnnualFundamentals[],
+  prices: PriceRow[],
+  sharesOutstanding: number | null
+): MultipleBand {
+  if (sharesOutstanding == null || sharesOutstanding <= 0) return null;
+
+  const priceNear = (dateStr: string): number | null => {
+    const d = new Date(dateStr);
+    let best: number | null = null;
+    let bestGap = Infinity;
+    for (const p of prices) {
+      if (p.adj_close == null) continue;
+      const gap = Math.abs(new Date(p.month).getTime() - d.getTime());
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = p.adj_close;
+      }
+    }
+    return bestGap < 100 * 86400000 ? best : null;
+  };
+
+  const multiples: number[] = [];
+  for (const r of rows) {
+    if (r.ocf == null || r.ocf <= 0 || r.shares_diluted == null) continue;
+    const p = priceNear(r.end_date);
+    if (p == null) continue;
+    multiples.push((p * r.shares_diluted) / r.ocf);
+  }
+  if (multiples.length < 6) return null;
+
+  const latest = [...rows].reverse().find((r) => r.ocf != null && r.ocf > 0);
+  if (!latest) return null;
+
+  multiples.sort((a, b) => a - b);
+  const pct = (q: number): number => {
+    const idx = q * (multiples.length - 1);
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    return multiples[lo] + (multiples[hi] - multiples[lo]) * (idx - lo);
+  };
+  const [p25, p50, p75] = [pct(0.25), pct(0.5), pct(0.75)];
+
+  const ocfPerShare = latest.ocf! / sharesOutstanding;
+  const now = prices.length ? prices[prices.length - 1].adj_close : null;
+  return {
+    years: multiples.length,
+    medianMultiple: p50,
+    currentMultiple: now != null ? (now * sharesOutstanding) / latest.ocf! : null,
+    low: p25 * ocfPerShare,
+    mid: p50 * ocfPerShare,
+    high: p75 * ocfPerShare,
+  };
+}
+
 export type DollarTest = {
   span: number;
   retained: number | null; // Σ (net income − dividends)

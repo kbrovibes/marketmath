@@ -15,6 +15,7 @@ import {
   buildTrackRecord,
   buildDollarTest,
   buildReinvestment,
+  buildMultipleBand,
 } from "@/lib/track-record";
 import { ensureCompany } from "@/lib/ingest/on-demand";
 
@@ -112,6 +113,7 @@ export default async function CompanyPage({ params }: PageProps) {
   const rows = splitAdjust(rawRows);
   const track = buildTrackRecord(rows, prices, spyPrices);
   const dollarTest = buildDollarTest(rows, prices);
+  const band = buildMultipleBand(rows, prices, company?.shares_outstanding ?? null);
   const reinvest = buildReinvestment(rows);
   const latest = rows[rows.length - 1];
   const years = rows.map((r) => r.fiscal_year);
@@ -267,6 +269,25 @@ export default async function CompanyPage({ params }: PageProps) {
             <Link href="/tools/reverse-dcf" className="underline underline-offset-2">
               Adjust the assumptions yourself →
             </Link>
+          </p>
+        </Card>
+      )}
+
+      {/* Historical multiple lens */}
+      {band && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="text-base font-semibold">Historical multiple lens</h2>
+          <p className="mt-2 text-sm leading-relaxed max-w-3xl tnum">
+            At its own median P/OCF of {fmtNum(band.medianMultiple, 1)}× across{" "}
+            {band.years} years, {company.ticker} would trade near ${fmtNum(band.mid, 0)}
+            /share (25th–75th percentile: ${fmtNum(band.low, 0)}–${fmtNum(band.high, 0)})
+            {band.currentMultiple != null && (
+              <>; it trades at {fmtNum(band.currentMultiple, 1)}× today</>
+            )}
+            .
+          </p>
+          <p className="mt-2 text-xs text-faint">
+            Assumes the historical multiple regime persists — re-ratings can be permanent.
           </p>
         </Card>
       )}
@@ -495,6 +516,8 @@ export default async function CompanyPage({ params }: PageProps) {
           <Stat label="MC vs 10× OCF" value={m?.mc_vs_10x_ocf != null ? fmtNum(m.mc_vs_10x_ocf, 2) : "—"} sub="≤1 = priced under 10× OCF" />
           <Stat label="Debt / FCF" value={m?.debt_to_fcf != null ? `${fmtNum(m.debt_to_fcf, 1)}y` : "—"} />
           <Stat label="SBC / FCF" value={fmtPct(m?.sbc_to_fcf)} />
+          <Stat label="Owner earnings" value={fmtMoney(m?.owner_earnings)} sub="OCF − capex − SBC" />
+          <Stat label="OE yield" value={fmtPct(m?.owner_earnings_yield)} />
           <Stat
             label="Share count 5y"
             value={fmtPctSigned(m?.share_change_5y)}
@@ -527,6 +550,50 @@ export default async function CompanyPage({ params }: PageProps) {
           </Card>
         )}
       </Section>
+
+      {/* Checklist */}
+      {m?.checklist && m.checklist.score_pct != null && (
+        <Section
+          title="Checklist"
+          subtitle={`${m.checklist.categories.reduce((s, c) => s + c.passed, 0)} of ${m.checklist.categories.reduce((s, c) => s + c.total, 0)} checks pass · ${fmtPct(m.checklist.score_pct, 0)}. Checks with structurally missing inputs are excluded.`}
+        >
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {m.checklist.categories.map((cat) => (
+              <Card key={cat.name} className="p-4">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-medium">{cat.name}</p>
+                  <p className="text-xs text-muted tnum">
+                    {cat.passed}/{cat.total}
+                  </p>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {cat.checks.map((c) => (
+                    <li key={c.id} className="flex items-start justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="leading-snug">{c.label}</p>
+                        <p className="text-faint tnum">
+                          {c.value} · {c.threshold}
+                        </p>
+                      </div>
+                      <Badge
+                        tone={
+                          c.status === "pass"
+                            ? "positive"
+                            : c.status === "fail"
+                              ? "negative"
+                              : "neutral"
+                        }
+                      >
+                        {c.status}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Red flags */}
       {(m?.red_flags?.length ?? 0) > 0 && (
