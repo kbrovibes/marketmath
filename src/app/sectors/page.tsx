@@ -20,7 +20,7 @@ function median(xs: number[]): number | null {
 export default async function SectorsPage() {
   const client = db();
   const [{ data: companies }, { data: metrics }] = await Promise.all([
-    client.from("mm_companies").select("ticker,name,sector,market_cap"),
+    client.from("mm_companies").select("ticker,name,sector,market_cap").eq("is_sp500", true),
     client.from("mm_metrics").select("ticker,data"),
   ]);
   const metricsBy = new Map((metrics ?? []).map((m) => [m.ticker, m.data as Record<string, unknown>]));

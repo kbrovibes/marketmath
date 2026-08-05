@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { db } from "@/lib/supabase";
+import { db, dbAdmin } from "@/lib/supabase";
 import {
   AnnualFundamentals,
   Metrics,
@@ -16,14 +16,18 @@ import {
   buildDollarTest,
   buildReinvestment,
 } from "@/lib/track-record";
+import { ensureCompany } from "@/lib/ingest/on-demand";
 
 export const revalidate = 3600;
 
 type PageProps = { params: Promise<{ ticker: string }> };
 
-async function getData(tickerRaw: string) {
+async function getData(tickerRaw: string, useAdmin = false) {
   const ticker = tickerRaw.toUpperCase();
-  const client = db();
+  // After on-demand ingestion the admin client is used for the re-read: its
+  // different auth header bypasses Next's per-render fetch memoization, which
+  // would otherwise replay the pre-ingestion empty responses.
+  const client = useAdmin ? dbAdmin() : db();
   const [
     { data: company },
     { data: rows },
@@ -65,7 +69,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CompanyPage({ params }: PageProps) {
   const { ticker: raw } = await params;
-  const { company, rows: rawRows, metrics: m, prices, spyPrices } = await getData(raw);
+  let data = await getData(raw);
+  if (!data.company) {
+    // Not in the seeded universe — try live ingestion from SEC EDGAR (any US filer)
+    const ingested = await ensureCompany(raw);
+    if (ingested) data = await getData(raw, true);
+  }
+  const { company, rows: rawRows, metrics: m, prices, spyPrices } = data;
   if (!company) notFound();
 
   const rows = splitAdjust(rawRows);

@@ -208,7 +208,12 @@ export default function AboutPage() {
 
       <Section title="Honest limitations">
         <ul className="text-sm text-muted space-y-1.5 list-disc pl-5 leading-relaxed">
-          <li>Coverage is the S&amp;P 500 only — no small caps, foreign listings, or ETFs.</li>
+          <li>
+            The seeded universe is the S&amp;P 500; any other US SEC filer is
+            ingested live the first time someone opens its page (a few seconds).
+            Foreign issuers without SEC XBRL filings and ETFs aren&apos;t covered.
+            The screener and sector pages stay scoped to the S&amp;P 500.
+          </li>
           <li>Annual data only; the latest quarter isn&apos;t reflected until the next 10-K.</li>
           <li>Banks and insurers: FCF, capex, gross margin and related metrics are structurally absent (shown as “—”), and cash-flow-based scores fit them poorly.</li>
           <li>Split adjustment is inferred from share-count jumps — accurate to a few percent, not exact.</li>

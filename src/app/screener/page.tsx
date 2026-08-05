@@ -13,7 +13,8 @@ export default async function ScreenerPage() {
   const [{ data: companies }, { data: metrics }] = await Promise.all([
     client
       .from("mm_companies")
-      .select("ticker,name,sector,market_cap,price"),
+      .select("ticker,name,sector,market_cap,price")
+      .eq("is_sp500", true),
     client.from("mm_metrics").select("ticker,data"),
   ]);
 

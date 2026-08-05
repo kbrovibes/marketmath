@@ -89,7 +89,15 @@ async function main() {
           );
           if (error) console.error(`   ${u.ticker}: db ${error.message}`);
         }
-        const shares = latestSharesOutstanding(cf);
+        // dei cover-page shares can be null/ambiguous for multi-class companies
+        // (GOOGL, META…) — fall back to latest diluted weighted shares.
+        let shares = latestSharesOutstanding(cf);
+        if (shares == null && rows.length > 0) {
+          const latestRow = rows.reduce((a, b) =>
+            a.fiscal_year >= b.fiscal_year ? a : b
+          );
+          shares = (latestRow.values.shares_diluted as number | null) ?? null;
+        }
         await db
           .from("mm_companies")
           .update({

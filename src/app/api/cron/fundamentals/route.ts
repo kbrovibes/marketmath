@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   const { data: companies } = await db.from("mm_companies").select("ticker,cik");
   if (!companies) return NextResponse.json({ error: "no companies" }, { status: 500 });
 
-  const mine = companies.filter((c) => parseInt(c.cik) % 7 === day);
+  const mine = companies.filter(
+    (c) => c.ticker !== "SPY" && parseInt(c.cik) % 7 === day
+  );
   let ok = 0;
   const errors: string[] = [];
 
