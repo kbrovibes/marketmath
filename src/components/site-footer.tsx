@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function SiteFooter() {
   return (
     <footer className="border-t border-border mt-16">
@@ -6,7 +8,15 @@ export function SiteFooter() {
           MarketMath — fundamentals from SEC filings. Educational use only; not
           investment advice.
         </p>
-        <p className="tnum">Data: SEC EDGAR · Prices: delayed</p>
+        <p className="flex gap-3">
+          <Link href="/about" className="hover:text-foreground">
+            How this works
+          </Link>
+          <Link href="/learn/how-to-use" className="hover:text-foreground">
+            How to use
+          </Link>
+          <span className="tnum">Data: SEC EDGAR · Prices: delayed</span>
+        </p>
       </div>
     </footer>
   );

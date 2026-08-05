@@ -21,6 +21,20 @@ export default function LearnPage() {
         looks like, and when it misleads.
       </p>
 
+      <Link href="/learn/how-to-use" className="block mt-6 group">
+        <Card className="p-5 border-accent/30 bg-accent-soft/40 transition-colors group-hover:border-accent/50">
+          <h3 className="font-semibold tracking-tight">
+            Start here: how to use MarketMath →
+          </h3>
+          <p className="text-sm text-muted mt-1.5 leading-relaxed max-w-2xl">
+            The six concepts that carry everything (CAGR, FCF, yields, DCF, reverse
+            DCF, quality) in plain language, then three worked workflows: judging one
+            company in ten minutes, finding ideas with the screener, and choosing
+            between rivals.
+          </p>
+        </Card>
+      </Link>
+
       <div className="mt-8 space-y-10">
         <Section title="Guides" subtitle="Frameworks for using the metrics together">
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
