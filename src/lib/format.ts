@@ -1,6 +1,7 @@
 /** Compact money: 1.23T, 456.7B, 89.1M */
 export function fmtMoney(n: number | null | undefined, currency = "$"): string {
   if (n == null || !isFinite(n)) return "—";
+  if (n === 0) return `${currency}0`;
   const abs = Math.abs(n);
   const sign = n < 0 ? "−" : "";
   if (abs >= 1e12) return `${sign}${currency}${(abs / 1e12).toFixed(2)}T`;
