@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
@@ -21,6 +21,16 @@ export const metadata: Metadata = {
   },
   description:
     "Long-horizon fundamentals, valuation math, and quality screens for US companies. Data from SEC filings.",
+  applicationName: "MarketMath",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MarketMath",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#fcfcfd",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
