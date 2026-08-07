@@ -53,6 +53,55 @@ export default async function Home() {
         </div>
       </div>
 
+      <div className="mt-16 max-w-4xl mx-auto">
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-semibold text-muted">
+            How it works — a 30-second example
+          </h2>
+          <span className="text-xs text-faint hidden sm:block">
+            Tap any step to try it
+          </span>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            {
+              href: "/company/COST",
+              step: "1",
+              title: "Pick a company",
+              desc: "Say, Costco. Search any S&P 500 ticker or tap a chip above.",
+              cta: "Open COST",
+            },
+            {
+              href: "/company/COST",
+              step: "2",
+              title: "Scan the fundamentals",
+              desc: "Twenty years of revenue, margins, ROIC, and a 0–100 quality score in one view.",
+              cta: "See the numbers",
+            },
+            {
+              href: "/tools/reverse-dcf?ticker=COST",
+              step: "3",
+              title: "Ask what the price assumes",
+              desc: "Reverse DCF solves for the growth baked into today's price — then you judge if it's plausible.",
+              cta: "Run reverse DCF",
+            },
+          ].map((s) => (
+            <Link key={s.step} href={s.href}>
+              <Card className="p-5 h-full hover:border-border-strong hover:shadow-sm transition-all">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-accent-soft text-accent grid place-items-center text-xs font-semibold">
+                    {s.step}
+                  </span>
+                  <h3 className="font-semibold text-sm">{s.title}</h3>
+                </div>
+                <p className="text-sm text-muted mt-2 leading-relaxed">{s.desc}</p>
+                <p className="text-xs text-accent font-medium mt-3">{s.cta} →</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-16 grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
         {[
           {
