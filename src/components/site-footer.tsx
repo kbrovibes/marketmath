@@ -9,6 +9,9 @@ export function SiteFooter() {
           investment advice.
         </p>
         <p className="flex gap-3">
+          <Link href="/sectors" className="hover:text-foreground md:hidden">
+            Sectors
+          </Link>
           <Link href="/about" className="hover:text-foreground">
             How this works
           </Link>
