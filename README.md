@@ -2,6 +2,8 @@
 
 Fundamentals dashboard for the S&P 500. Twenty years of as-filed 10-K data per company, valuation math, transparent quality scores, and small interactive calculators. Live at **https://marketmath-theta.vercel.app**.
 
+**Landing page:** https://kbrovibes.github.io/marketmath/ — what it is, a tour of the four main screens, and the stack.
+
 Every number is traceable to an SEC filing; every score and preset prints its rules. In-app docs: [/about](https://marketmath-theta.vercel.app/about) (data pipeline, design choices, alternatives) and [/learn/how-to-use](https://marketmath-theta.vercel.app/learn/how-to-use) (concepts + workflows).
 
 ![Home](docs/screenshots/home.jpg)
